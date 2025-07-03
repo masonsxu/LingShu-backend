@@ -8,73 +8,17 @@
 from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from sqlmodel import Session, select
 
-from app.core.channel_processor import ChannelProcessor
+from app.application.channel_processor import ChannelProcessor
 from app.infrastructure.database import create_db_and_tables, get_session
 from app.domain.models.channel import ChannelModel
 
 app = APIRouter()
 
 # Initialize the channel processor
-channel_processor = ChannelProcessor()
 
-
-@app.on_event("startup")
-async def startup_event():
-    create_db_and_tables()
-    # Add an example channel to the database on startup if it doesn't exist
-    with next(get_session()) as session:
-        example_channel_id = "example-http-to-http"
-        existing_channel = session.get(ChannelModel, example_channel_id)
-        if not existing_channel:
-            example_channel_data = {
-                "id": example_channel_id,
-                "name": "HTTP to HTTP Passthrough",
-                "description": "A simple channel that receives HTTP POST and forwards it to another HTTP endpoint.",
-                "enabled": True,
-                "source": {"type": "http", "path": "/receive/data", "method": "POST"},
-                "filters": [
-                    {
-                        "type": "python_script",
-                        "script": """# Example filter: only allow messages containing 'important_data'
-                                        if 'important_data' in message:
-                                            _passed = True
-                                        else:
-                                            _passed = False
-                                    """,
-                    }
-                ],
-                "transformers": [
-                    {
-                        "type": "python_script",
-                        "script": """# Example transformer: add a timestamp to the message
-                        import datetime
-                        _transformed_message = f"{message} - Processed at {datetime.datetime.now()}"
-                        """,
-                    }
-                ],
-                "destinations": [
-                    {
-                        "type": "http",
-                        "url": "https://webhook.site/YOUR_WEBHOOK_URL",  # Replace with a real webhook URL for testing
-                        "method": "POST",
-                        "headers": {"Content-Type": "text/plain"},
-                    }
-                ],
-            }
-            try:
-                example_channel = ChannelModel(**example_channel_data)
-                session.add(example_channel)
-                session.commit()
-                session.refresh(example_channel)
-                print(f"Loaded example channel: {example_channel.name}")
-            except ValidationError as e:
-                print(f"Error loading example channel: {e}")
-        else:
-            print(f"Example channel '{existing_channel.name}' already exists in DB.")
 
 
 @app.get("/", tags=["Root"])
@@ -141,5 +85,6 @@ async def process_message_for_channel(
         )
 
     # Process the message using the ChannelProcessor
+    channel_processor = ChannelProcessor()
     result = await channel_processor.process_message(channel, message)
     return result
