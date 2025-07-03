@@ -115,26 +115,4 @@ class ChannelModel(SQLModel, table=True):
         sa_column=Column(JSON), description="List of data destinations."
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def validate_channel_data(cls, data: Any) -> Any:
-        # This validator helps in deserialization from JSON stored in DB
-        # when the data might be a dict and needs to be converted to Pydantic models
-        if isinstance(data, dict):
-            if "source" in data and isinstance(data["source"], dict):
-                data["source"] = SourceConfigType.model_validate(data["source"])
-            if "filters" in data and isinstance(data["filters"], list):
-                data["filters"] = [
-                    FilterConfigType.model_validate(f) for f in data["filters"]
-                ]
-            if "transformers" in data and isinstance(data["transformers"], list):
-                data["transformers"] = [
-                    TransformerConfigType.model_validate(t)
-                    for t in data["transformers"]
-                ]
-            if "destinations" in data and isinstance(data["destinations"], list):
-                data["destinations"] = [
-                    DestinationConfigType.model_validate(d)
-                    for d in data["destinations"]
-                ]
-        return data
+    

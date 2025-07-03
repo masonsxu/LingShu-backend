@@ -60,14 +60,5 @@ async def process_message_for_channel(
     message: Any = Body(..., description="Message to process"),
     repo: ChannelRepository = Depends(get_channel_repository)
 ):
-    channel = repo.get_by_id(channel_id)
-    if not channel:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found."
-        )
-    if not channel.enabled:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Channel is disabled."
-        )
-    result = await channel_processor.process_message(channel, message)
+    result = await channel_processor.process_message_with_checks(channel_id, message, repo)
     return result

@@ -6,6 +6,7 @@
 
 import logging
 from typing import Any
+from fastapi import HTTPException, status
 from sqlmodel import Session
 
 from app.domain.models.channel import (
@@ -15,6 +16,7 @@ from app.domain.models.channel import (
     PythonScriptTransformerConfig,
     TCPDestinationConfig,
 )
+from app.domain.repositories.channel_repository import ChannelRepository
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,27 @@ logger = logging.getLogger(__name__)
 class ChannelProcessor:
     def __init__(self):
         pass
+
+    def create_channel_with_checks(self, channel: ChannelModel, repo: ChannelRepository) -> ChannelModel:
+        existing_channel = repo.get_by_id(channel.id)
+        if existing_channel:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Channel with ID '{channel.id}' already exists.",
+            )
+        return repo.add(channel)
+
+    async def process_message_with_checks(self, channel_id: str, message: Any, repo: ChannelRepository) -> dict:
+        channel = repo.get_by_id(channel_id)
+        if not channel:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found."
+            )
+        if not channel.enabled:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Channel is disabled."
+            )
+        return await self.process_message(channel, message)
 
     async def process_message(self, channel: ChannelModel, message: Any) -> dict:
         """Processes a message through the given channel's filters, transformers, and destinations."""
@@ -98,39 +121,47 @@ class ChannelProcessor:
 
         # --- Destinations ---
         results = []
+        validated_destinations = []
+        for d in channel.destinations:
+            if isinstance(d, dict):
+                validated_destinations.append(DestinationConfigType.model_validate(d))
+            else:
+                validated_destinations.append(d)
+        channel.destinations = validated_destinations
+
         for i, destination_config in enumerate(channel.destinations):
             logger.debug(
                 f"Sending message to destination {i} for channel '{channel.name}'"
             )
             try:
-                if isinstance(destination_config.__root__, HTTPDestinationConfig):
+                if isinstance(destination_config, HTTPDestinationConfig):
                     # Simulate HTTP POST/GET
                     logger.info(
-                        f"Simulating HTTP {destination_config.__root__.method} to {destination_config.__root__.url} with message: {current_message}"
+                        f"Simulating HTTP {destination_config.method} to {destination_config.url} with message: {current_message}"
                     )
                     results.append(
                         {
                             "destination_type": "http",
                             "status": "sent",
-                            "url": destination_config.__root__.url,
+                            "url": destination_config.url,
                         }
                     )
-                elif isinstance(destination_config.__root__, TCPDestinationConfig):
+                elif isinstance(destination_config, TCPDestinationConfig):
                     # Simulate TCP send
                     logger.info(
-                        f"Simulating TCP send to {destination_config.__root__.host}:{destination_config.__root__.port} with message: {current_message}"
+                        f"Simulating TCP send to {destination_config.host}:{destination_config.port} with message: {current_message}"
                     )
                     results.append(
                         {
                             "destination_type": "tcp",
                             "status": "sent",
-                            "host": destination_config.__root__.host,
-                            "port": destination_config.__root__.port,
+                            "host": destination_config.host,
+                            "port": destination_config.port,
                         }
                     )
                 else:
                     logger.warning(
-                        f"Unknown destination type: {destination_config.__root__.type}"
+                        f"Unknown destination type: {destination_config.type}"
                     )
                     results.append({"destination_type": "unknown", "status": "skipped"})
             except Exception as e:
@@ -139,7 +170,7 @@ class ChannelProcessor:
                 )
                 results.append(
                     {
-                        "destination_type": destination_config.__root__.type,
+                        "destination_type": destination_config.type,
                         "status": "error",
                         "error": str(e),
                     }

@@ -34,4 +34,22 @@ def test_process_message_for_channel(client):
     # 处理消息
     response = client.post("/channels/process-test/process", json={"message": "hello"})
     assert response.status_code == 200
-    assert "status" in response.json() 
+    assert "status" in response.json()
+
+def test_process_message_channel_not_found(client):
+    response = client.post("/channels/non-existent/process", json={"message": "test"})
+    assert response.status_code == 404
+    assert "Channel not found" in response.json()["detail"]
+
+def test_process_message_channel_disabled(client):
+    channel_data = {
+        "id": "disabled-test",
+        "name": "Disabled Test Channel",
+        "enabled": False,
+        "source": {"type": "http", "path": "/disabled", "method": "POST"},
+        "destinations": [{"type": "http", "url": "http://disabled", "method": "POST"}]
+    }
+    client.post("/channels/", json=channel_data)
+    response = client.post("/channels/disabled-test/process", json={"message": "test"})
+    assert response.status_code == 400
+    assert "Channel is disabled" in response.json()["detail"] 
