@@ -1,0 +1,18 @@
+# LingShu Backend - Development Rules
+
+## Test-Driven Development (TDD)
+
+This project strictly follows Test-Driven Development (TDD) principles. All code generation and modification must adhere to the following workflow:
+
+1.  **Write a Failing Test First:** Before writing any new implementation code, first write a test case that defines the desired functionality or reproduces the bug. This test should fail initially.
+
+2.  **Write Code to Pass the Test:** Write the minimum amount of implementation code necessary to make the failing test pass.
+
+3.  **Refactor:** Once the test is passing, refactor the implementation code for clarity, performance, and maintainability, ensuring the test continues to pass.
+
+### Specific Guidelines:
+
+*   **New Features:** For any new function, class, or API endpoint added to the `app/` directory, a corresponding test file must be created in the `tests/` directory. The test file should mirror the path of the source file (e.g., tests for `app/core/utils.py` should be in `tests/core/test_utils.py`).
+*   **Bug Fixes:** When fixing a bug, you must first add a test case that specifically fails due to the bug. The fix is complete only when this test (and all other tests) passes.
+*   **Code Coverage:** Aim for high test coverage. All new logic should be covered by tests.
+*   **Run All Tests:** Before committing any changes, run the entire test suite to ensure that your changes have not introduced any regressions.
