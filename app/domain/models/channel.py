@@ -1,12 +1,13 @@
 from typing import Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
+from pydantic import Field as PydanticField
 from sqlmodel import JSON, Column, Field, SQLModel
 
 
 # --- 基础配置类 ---
 class BaseConfig(BaseModel):
-    type: str = Field(
+    type: str = PydanticField(
         ..., description="组件类型。"
     )  # 指定配置所属的组件类型（如 http、tcp 等）
 
@@ -14,8 +15,8 @@ class BaseConfig(BaseModel):
 # --- 源（Source）配置 ---
 class HTTPSourceConfig(BaseConfig):
     type: Literal["http"] = "http"  # 固定为 http 类型
-    path: str = Field(..., description="监听的 HTTP 路径。")  # 监听的 HTTP 路径
-    method: Literal["GET", "POST", "PUT", "DELETE"] = Field(
+    path: str = PydanticField(..., description="监听的 HTTP 路径。")  # 监听的 HTTP 路径
+    method: Literal["GET", "POST", "PUT", "DELETE"] = PydanticField(
         ...,
         description="允许的 HTTP 方法。",  # 允许的 HTTP 方法
     )
@@ -23,11 +24,11 @@ class HTTPSourceConfig(BaseConfig):
 
 class TCPSourceConfig(BaseConfig):
     type: Literal["tcp"] = "tcp"  # 固定为 tcp 类型
-    port: int = Field(..., description="监听的 TCP 端口。")  # 监听的端口号
-    host: str = Field(
+    port: int = PydanticField(..., description="监听的 TCP 端口。")  # 监听的端口号
+    host: str = PydanticField(
         "0.0.0.0", description="绑定的主机地址。"
     )  # 绑定的主机地址，默认所有网卡
-    use_mllp: bool = Field(
+    use_mllp: bool = PydanticField(
         False,
         description="是否使用 MLLP（HL7 消息）封装。",  # HL7 协议专用
     )
@@ -40,7 +41,7 @@ SourceConfigType = Union[HTTPSourceConfig, TCPSourceConfig]  # 源配置类型�
 # --- 过滤器（Filter）配置 ---
 class PythonScriptFilterConfig(BaseConfig):
     type: Literal["python_script"] = "python_script"  # 固定为 python_script 类型
-    script: str = Field(
+    script: str = PydanticField(
         ...,
         description="用于消息过滤的 Python 脚本，返回 True 保留，False 过滤。",  # 过滤逻辑脚本
     )
@@ -53,7 +54,7 @@ FilterConfigType = Union[PythonScriptFilterConfig]  # 过滤器配置类型别�
 # --- 转换器（Transformer）配置 ---
 class PythonScriptTransformerConfig(BaseConfig):
     type: Literal["python_script"] = "python_script"  # 固定为 python_script 类型
-    script: str = Field(
+    script: str = PydanticField(
         ...,
         description="用于消息转换的 Python 脚本，返回转换后的消息。",  # 转换逻辑脚本
     )
@@ -66,12 +67,12 @@ TransformerConfigType = Union[PythonScriptTransformerConfig]  # 转换器配置�
 # --- 目标（Destination）配置 ---
 class HTTPDestinationConfig(BaseConfig):
     type: Literal["http"] = "http"  # 固定为 http 类型
-    url: str = Field(..., description="目标 HTTP 地址。")  # 目标 HTTP 服务地址
-    method: Literal["GET", "POST", "PUT", "DELETE"] = Field(
+    url: str = PydanticField(..., description="目标 HTTP 地址。")  # 目标 HTTP 服务地址
+    method: Literal["GET", "POST", "PUT", "DELETE"] = PydanticField(
         "POST",
         description="HTTP 请求方法。",  # 默认 POST
     )
-    headers: Optional[Dict[str, str]] = Field(
+    headers: Optional[Dict[str, str]] = PydanticField(
         None,
         description="可选的 HTTP 请求头。",  # 可选 HTTP 头
     )
@@ -79,9 +80,9 @@ class HTTPDestinationConfig(BaseConfig):
 
 class TCPDestinationConfig(BaseConfig):
     type: Literal["tcp"] = "tcp"  # 固定为 tcp 类型
-    host: str = Field(..., description="目标 TCP 主机。")  # 目标主机地址
-    port: int = Field(..., description="目标 TCP 端口。")  # 目标端口号
-    use_mllp: bool = Field(
+    host: str = PydanticField(..., description="目标 TCP 主机。")  # 目标主机地址
+    port: int = PydanticField(..., description="目标 TCP 端口。")  # 目标端口号
+    use_mllp: bool = PydanticField(
         False,
         description="是否使用 MLLP（HL7 消息）封装。",  # HL7 协议专用
     )
