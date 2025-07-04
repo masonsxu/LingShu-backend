@@ -1,4 +1,4 @@
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from sqlmodel import Session, select
 
@@ -6,17 +6,52 @@ from app.domain.models.channel import ChannelModel
 
 
 class ChannelRepository:
+    """ChannelRepository 是 ChannelModel 的仓储类.
+
+    用于从数据库获取通道或向数据库添加新通道.
+    """
+
     def __init__(self, session: Session):
+        """初始化 ChannelRepository.
+
+        参数：
+            session: 用于数据库操作的会话对象.
+
+        """
         self.session = session
 
-    def get_by_id(self, channel_id: str) -> Optional[ChannelModel]:
+    def get_by_id(self, channel_id: str) -> ChannelModel | None:
+        """根据 id 获取通道.
+
+        参数：
+            channel_id: 要获取的通道 id.
+
+        返回：
+            匹配的通道对象，若不存在则为 None.
+
+        """
         return self.session.get(ChannelModel, channel_id)
 
     def get_all(self) -> Sequence[ChannelModel]:
+        """获取所有通道.
+
+        返回：
+            所有通道对象的列表.
+
+        """
         channels = self.session.exec(select(ChannelModel)).all()
         return channels
 
     def add(self, channel: ChannelModel) -> ChannelModel:
+        """向数据库添加一个通道.
+
+        参数：
+            channel: 要添加的通道对象.
+
+        返回：
+            添加后的通道对象.
+
+        """
         # 构造用于数据库写入的 dict
         channel_data = channel.model_dump()
         # 这里所有嵌套的 Pydantic 对象都已被递归转为 dict

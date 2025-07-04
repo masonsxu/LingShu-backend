@@ -1,6 +1,8 @@
 import logging
 from typing import Any
 
+from fastapi import HTTPException, status
+
 from app.domain.models.channel import (
     ChannelModel,
     HTTPDestinationConfig,
@@ -9,18 +11,30 @@ from app.domain.models.channel import (
     TCPDestinationConfig,
 )
 from app.domain.repositories.channel_repository import ChannelRepository
-from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
 
 
 class ChannelProcessor:
+    """通道处理器：负责通道的创建校验、消息处理（过滤、转换、分发）等核心业务逻辑."""
+
     def __init__(self):
+        """初始化通道处理器."""
         pass
 
     def create_channel_with_checks(
         self, channel: ChannelModel, repo: ChannelRepository
     ) -> ChannelModel:
+        """创建通道前进行唯一性和参数校验。
+
+        参数：
+            channel: 待创建的通道对象。
+            repo: 通道仓储实例。
+        返回：
+            创建成功的通道对象。
+        异常：
+            HTTPException: 若 id 缺失或已存在则抛出 400/409 错误。
+        """
         if channel.id is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -37,11 +51,20 @@ class ChannelProcessor:
     async def process_message_with_checks(
         self, channel_id: str, message: Any, repo: ChannelRepository
     ) -> dict:
+        """校验通道状态后处理消息。
+
+        参数：
+            channel_id: 通道唯一标识。
+            message: 待处理消息。
+            repo: 通道仓储实例。
+        返回：
+            处理结果字典。
+        异常：
+            HTTPException: 通道不存在或被禁用时抛出。
+        """
         channel = repo.get_by_id(channel_id)
         if not channel:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found."
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Channel not found.")
         if not channel.enabled:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Channel is disabled."
@@ -49,24 +72,47 @@ class ChannelProcessor:
         return await self.process_message(channel, message)
 
     async def process_message(self, channel: ChannelModel, message: Any) -> dict:
-        """Processes a message through the given channel's filters, transformers, and destinations."""
-        logger.info(
-            f"Processing message for channel '{channel.name}' (ID: {channel.id})"
-        )
+        """按通道配置依次执行过滤、转换、分发等处理流程。
+
+        参数：
+            channel: 通道对象。
+            message: 原始消息。
+        返回：
+            处理结果字典，包括最终消息和各目标分发结果。
+        """
+        logger.info(f"Processing message for channel '{channel.name}' (ID: {channel.id})")
         current_message = message
 
-        # --- Filters ---
+        # 过滤
+        filter_result = self._apply_filters(channel, current_message)
+        if isinstance(filter_result, dict):
+            return filter_result
+        current_message = filter_result
+
+        # 转换
+        transformer_result = self._apply_transformers(channel, current_message)
+        if isinstance(transformer_result, dict):
+            return transformer_result
+        current_message = transformer_result
+
+        # 分发
+        results = self._dispatch_to_destinations(channel, current_message)
+
+        return {
+            "status": "success",
+            "processed_message": current_message,
+            "destination_results": results,
+        }
+
+    def _apply_filters(self, channel: ChannelModel, message: Any) -> Any:
+        """依次应用所有过滤器，若被过滤或出错则返回 dict，否则返回处理后的消息。"""
         if channel.filters:
             for i, filter_config in enumerate(channel.filters):
                 if isinstance(filter_config, PythonScriptFilterConfig):
                     script = filter_config.script
-                    logger.debug(
-                        f"Applying Python script filter {i} for channel '{channel.name}'"
-                    )
+                    logger.debug(f"Applying Python script filter {i} for channel '{channel.name}'")
                     try:
-                        # WARNING: Executing arbitrary code from configuration is a security risk.
-                        # In a production environment, this requires a secure sandboxing mechanism.
-                        local_vars = {"message": current_message, "_passed": False}
+                        local_vars = {"message": message, "_passed": False}
                         exec(script, {}, local_vars)
                         if not local_vars.get("_passed", False):
                             logger.info(
@@ -76,9 +122,7 @@ class ChannelProcessor:
                                 "status": "filtered",
                                 "message": "Message filtered out.",
                             }
-                        current_message = local_vars.get(
-                            "message", current_message
-                        )  # Allow script to modify message
+                        message = local_vars.get("message", message)
                     except Exception as e:
                         logger.error(
                             f"Error executing filter script {i} for channel '{channel.name}': {e}"
@@ -87,8 +131,10 @@ class ChannelProcessor:
                             "status": "error",
                             "message": f"Filter script error: {e}",
                         }
+        return message
 
-        # --- Transformers ---
+    def _apply_transformers(self, channel: ChannelModel, message: Any) -> Any:
+        """依次应用所有转换器，若出错则返回 dict，否则返回处理后的消息。"""
         if channel.transformers:
             for i, transformer_config in enumerate(channel.transformers):
                 if isinstance(transformer_config, PythonScriptTransformerConfig):
@@ -97,41 +143,41 @@ class ChannelProcessor:
                         f"Applying Python script transformer {i} for channel '{channel.name}'"
                     )
                     try:
-                        # WARNING: Executing arbitrary code from configuration is a security risk.
-                        # In a production environment, this requires a secure sandboxing mechanism.
                         local_vars = {
-                            "message": current_message,
+                            "message": message,
                             "_transformed_message": None,
                         }
                         exec(script, {}, local_vars)
                         if "_transformed_message" in local_vars:
-                            current_message = local_vars["_transformed_message"]
+                            message = local_vars["_transformed_message"]
                         else:
                             logger.warning(
-                                f"Transformer script {i} for channel '{channel.name}' did not set '_transformed_message'. Message remains unchanged."
+                                f"Transformer script {i} for channel '{channel.name}' "
+                                "did not set '_transformed_message'. "
+                                "Message remains unchanged."
                             )
                     except Exception as e:
                         logger.error(
-                            f"Error executing transformer script {i} for channel '{channel.name}': {e}"
+                            f"Error executing transformer script {i} for channel "
+                            f"'{channel.name}': {e}"
                         )
                         return {
                             "status": "error",
                             "message": f"Transformer script error: {e}",
                         }
+        return message
 
-        # --- Destinations ---
+    def _dispatch_to_destinations(self, channel: ChannelModel, message: Any) -> list[dict]:
+        """将消息分发到所有目标，返回分发结果列表。"""
         results = []
-        # Destinations are already validated Pydantic models, no need for additional validation
-
         for i, destination_config in enumerate(channel.destinations):
-            logger.debug(
-                f"Sending message to destination {i} for channel '{channel.name}'"
-            )
+            logger.debug(f"Sending message to destination {i} for channel '{channel.name}'")
             try:
                 if isinstance(destination_config, HTTPDestinationConfig):
-                    # Simulate HTTP POST/GET
                     logger.info(
-                        f"Simulating HTTP {destination_config.method} to {destination_config.url} with message: {current_message}"
+                        "Simulating HTTP "
+                        f"{destination_config.method} to "
+                        f"{destination_config.url} with message: {message}"
                     )
                     results.append(
                         {
@@ -141,9 +187,10 @@ class ChannelProcessor:
                         }
                     )
                 elif isinstance(destination_config, TCPDestinationConfig):
-                    # Simulate TCP send
                     logger.info(
-                        f"Simulating TCP send to {destination_config.host}:{destination_config.port} with message: {current_message}"
+                        "Simulating TCP send to "
+                        f"{destination_config.host}:{destination_config.port} "
+                        f"with message: {message}"
                     )
                     results.append(
                         {
@@ -154,15 +201,10 @@ class ChannelProcessor:
                         }
                     )
                 else:
-                    logger.warning(
-                        f"Unknown destination type: {destination_config.type}"
-                    )
+                    logger.warning(f"Unknown destination type: {destination_config.type}")
                     results.append({"destination_type": "unknown", "status": "skipped"})
             except Exception as e:
-                logger.error(
-                    f"Error sending to destination {i} for channel '{channel.name}': {e}"
-                )
-                # Handle both Pydantic models and dictionaries
+                logger.error(f"Error sending to destination {i} for channel '{channel.name}': {e}")
                 if hasattr(destination_config, "type"):
                     destination_type = destination_config.type
                 elif isinstance(destination_config, dict):
@@ -176,9 +218,4 @@ class ChannelProcessor:
                         "error": str(e),
                     }
                 )
-
-        return {
-            "status": "success",
-            "processed_message": current_message,
-            "destination_results": results,
-        }
+        return results
