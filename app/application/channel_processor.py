@@ -1,13 +1,5 @@
-# -*- coding: utf-8 -*-
-# @Time  : 2025/07/03 17:30
-# @Author: masonsxu
-# @File  : channel_processor.py
-# @Desc  : Application service for processing channel messages
-
 import logging
 from typing import Any
-from fastapi import HTTPException, status
-from sqlmodel import Session
 
 from app.domain.models.channel import (
     ChannelModel,
@@ -17,6 +9,7 @@ from app.domain.models.channel import (
     TCPDestinationConfig,
 )
 from app.domain.repositories.channel_repository import ChannelRepository
+from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +18,14 @@ class ChannelProcessor:
     def __init__(self):
         pass
 
-    def create_channel_with_checks(self, channel: ChannelModel, repo: ChannelRepository) -> ChannelModel:
+    def create_channel_with_checks(
+        self, channel: ChannelModel, repo: ChannelRepository
+    ) -> ChannelModel:
+        if channel.id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Channel ID cannot be None.",
+            )
         existing_channel = repo.get_by_id(channel.id)
         if existing_channel:
             raise HTTPException(
@@ -34,7 +34,9 @@ class ChannelProcessor:
             )
         return repo.add(channel)
 
-    async def process_message_with_checks(self, channel_id: str, message: Any, repo: ChannelRepository) -> dict:
+    async def process_message_with_checks(
+        self, channel_id: str, message: Any, repo: ChannelRepository
+    ) -> dict:
         channel = repo.get_by_id(channel_id)
         if not channel:
             raise HTTPException(
@@ -56,8 +58,8 @@ class ChannelProcessor:
         # --- Filters ---
         if channel.filters:
             for i, filter_config in enumerate(channel.filters):
-                if isinstance(filter_config.__root__, PythonScriptFilterConfig):
-                    script = filter_config.__root__.script
+                if isinstance(filter_config, PythonScriptFilterConfig):
+                    script = filter_config.script
                     logger.debug(
                         f"Applying Python script filter {i} for channel '{channel.name}'"
                     )
@@ -89,10 +91,8 @@ class ChannelProcessor:
         # --- Transformers ---
         if channel.transformers:
             for i, transformer_config in enumerate(channel.transformers):
-                if isinstance(
-                    transformer_config.__root__, PythonScriptTransformerConfig
-                ):
-                    script = transformer_config.__root__.script
+                if isinstance(transformer_config, PythonScriptTransformerConfig):
+                    script = transformer_config.script
                     logger.debug(
                         f"Applying Python script transformer {i} for channel '{channel.name}'"
                     )
@@ -121,13 +121,7 @@ class ChannelProcessor:
 
         # --- Destinations ---
         results = []
-        validated_destinations = []
-        for d in channel.destinations:
-            if isinstance(d, dict):
-                validated_destinations.append(DestinationConfigType.model_validate(d))
-            else:
-                validated_destinations.append(d)
-        channel.destinations = validated_destinations
+        # Destinations are already validated Pydantic models, no need for additional validation
 
         for i, destination_config in enumerate(channel.destinations):
             logger.debug(
@@ -168,9 +162,16 @@ class ChannelProcessor:
                 logger.error(
                     f"Error sending to destination {i} for channel '{channel.name}': {e}"
                 )
+                # Handle both Pydantic models and dictionaries
+                if hasattr(destination_config, "type"):
+                    destination_type = destination_config.type
+                elif isinstance(destination_config, dict):
+                    destination_type = destination_config.get("type", "unknown")
+                else:
+                    destination_type = "unknown"
                 results.append(
                     {
-                        "destination_type": destination_config.type,
+                        "destination_type": destination_type,
                         "status": "error",
                         "error": str(e),
                     }
