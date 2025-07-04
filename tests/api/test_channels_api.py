@@ -1,4 +1,5 @@
 def test_create_and_get_channel(client):
+    """Test create and get channel."""
     channel_data = {
         "id": "api-test",
         "name": "API Test Channel",
@@ -16,12 +17,14 @@ def test_create_and_get_channel(client):
 
 
 def test_get_all_channels(client):
+    """Test get all channels."""
     response = client.get("/channels/")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 
 def test_process_message_for_channel(client):
+    """Test process message for channel."""
     # 先确保有一个channel
     channel_data = {
         "id": "process-test",
@@ -38,12 +41,14 @@ def test_process_message_for_channel(client):
 
 
 def test_process_message_channel_not_found(client):
+    """Test process message channel not found."""
     response = client.post("/channels/non-existent/process", json={"message": "test"})
     assert response.status_code == 404
     assert "Channel not found" in response.json()["detail"]
 
 
 def test_process_message_channel_disabled(client):
+    """Test process message channel disabled."""
     channel_data = {
         "id": "disabled-test",
         "name": "Disabled Test Channel",
