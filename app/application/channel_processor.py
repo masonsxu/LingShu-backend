@@ -85,13 +85,13 @@ class ChannelProcessor:
 
         # 过滤
         filter_result = self._apply_filters(channel, current_message)
-        if isinstance(filter_result, dict):
+        if filter_result is not None:
             return filter_result
         current_message = filter_result
 
         # 转换
         transformer_result = self._apply_transformers(channel, current_message)
-        if isinstance(transformer_result, dict):
+        if transformer_result is not None:
             return transformer_result
         current_message = transformer_result
 
@@ -106,66 +106,62 @@ class ChannelProcessor:
 
     def _apply_filters(self, channel: ChannelModel, message: Any) -> Any:
         """依次应用所有过滤器，若被过滤或出错则返回 dict，否则返回处理后的消息。"""
-        if channel.filters:
-            for i, filter_config in enumerate(channel.filters):
-                if isinstance(filter_config, PythonScriptFilterConfig):
-                    script = filter_config.script
-                    logger.debug(f"Applying Python script filter {i} for channel '{channel.name}'")
-                    try:
-                        local_vars = {"message": message, "_passed": False}
-                        exec(script, {}, local_vars)
-                        if not local_vars.get("_passed", False):
-                            logger.info(
-                                f"Message filtered out by script {i} for channel '{channel.name}'"
-                            )
-                            return {
-                                "status": "filtered",
-                                "message": "Message filtered out.",
-                            }
-                        message = local_vars.get("message", message)
-                    except Exception as e:
-                        logger.error(
-                            f"Error executing filter script {i} for channel '{channel.name}': {e}"
-                        )
-                        return {
-                            "status": "error",
-                            "message": f"Filter script error: {e}",
-                        }
-        return message
+        if not channel.filters:
+            return None
+        for i, filter_config in enumerate(channel.filters):
+            if not isinstance(filter_config, PythonScriptFilterConfig):
+                continue
+            script = filter_config.script
+            logger.debug(f"Applying Python script filter {i} for channel '{channel.name}'")
+            try:
+                local_vars = {"message": message, "_passed": False}
+                exec(script, {}, local_vars)
+                if not local_vars.get("_passed", False):
+                    logger.info(f"Message filtered out by script {i} for channel '{channel.name}'")
+                    return {
+                        "status": "filtered",
+                        "message": "Message filtered out.",
+                    }
+                message = local_vars.get("message", message)
+            except Exception as e:
+                logger.error(f"Error executing filter script {i} for channel '{channel.name}': {e}")
+                return {
+                    "status": "error",
+                    "message": f"Filter script error: {e}",
+                }
 
     def _apply_transformers(self, channel: ChannelModel, message: Any) -> Any:
         """依次应用所有转换器，若出错则返回 dict，否则返回处理后的消息。"""
-        if channel.transformers:
-            for i, transformer_config in enumerate(channel.transformers):
-                if isinstance(transformer_config, PythonScriptTransformerConfig):
-                    script = transformer_config.script
-                    logger.debug(
-                        f"Applying Python script transformer {i} for channel '{channel.name}'"
+        if not channel.transformers:
+            return None
+
+        for i, transformer_config in enumerate(channel.transformers):
+            if not isinstance(transformer_config, PythonScriptTransformerConfig):
+                continue
+            script = transformer_config.script
+            logger.debug(f"Applying Python script transformer {i} for channel '{channel.name}'")
+            try:
+                local_vars = {
+                    "message": message,
+                    "_transformed_message": None,
+                }
+                exec(script, {}, local_vars)
+                if "_transformed_message" in local_vars:
+                    message = local_vars["_transformed_message"]
+                else:
+                    logger.warning(
+                        f"Transformer script {i} for channel '{channel.name}' "
+                        "did not set '_transformed_message'. "
+                        "Message remains unchanged."
                     )
-                    try:
-                        local_vars = {
-                            "message": message,
-                            "_transformed_message": None,
-                        }
-                        exec(script, {}, local_vars)
-                        if "_transformed_message" in local_vars:
-                            message = local_vars["_transformed_message"]
-                        else:
-                            logger.warning(
-                                f"Transformer script {i} for channel '{channel.name}' "
-                                "did not set '_transformed_message'. "
-                                "Message remains unchanged."
-                            )
-                    except Exception as e:
-                        logger.error(
-                            f"Error executing transformer script {i} for channel "
-                            f"'{channel.name}': {e}"
-                        )
-                        return {
-                            "status": "error",
-                            "message": f"Transformer script error: {e}",
-                        }
-        return message
+            except Exception as e:
+                logger.error(
+                    f"Error executing transformer script {i} for channel '{channel.name}': {e}"
+                )
+                return {
+                    "status": "error",
+                    "message": f"Transformer script error: {e}",
+                }
 
     def _dispatch_to_destinations(self, channel: ChannelModel, message: Any) -> list[dict]:
         """将消息分发到所有目标，返回分发结果列表。"""
