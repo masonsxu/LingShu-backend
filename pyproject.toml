@@ -48,3 +48,45 @@ dependencies = [
     "watchfiles==1.1.0",
     "websockets==15.0.1",
 ]
+
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+exclude = [".venv", "venv", "migrations", "__pycache__"]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "A",    # flake8-builtins
+    "C90",  # mccabe complexity
+    "D",    # pydocstyle (docstring)
+]
+ignore = [
+    "D100",  # 忽略模块 docstring 要求
+    "D104",  # 忽略包 docstring 要求
+    "D415",  # 忽略包 docstring 要求
+    "D400",  # 忽略包 docstring 要求
+    "B008",  # FastAPI依赖注入场景下，忽略这个报错
+]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+skip-magic-trailing-comma = false
+
+[tool.ruff.isort]
+known-first-party = ["app"]
+combine-as-imports = true
+force-single-line = false
+
+
