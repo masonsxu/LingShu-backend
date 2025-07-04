@@ -69,13 +69,8 @@ select = [
     "SIM",  # flake8-simplify
     "A",    # flake8-builtins
     "C90",  # mccabe complexity
-    "D",    # pydocstyle (docstring)
 ]
 ignore = [
-    "D100",  # 忽略模块 docstring 要求
-    "D104",  # 忽略包 docstring 要求
-    "D415",  # 忽略包 docstring 要求
-    "D400",  # 忽略包 docstring 要求
     "B008",  # FastAPI依赖注入场景下，忽略这个报错
 ]
 
