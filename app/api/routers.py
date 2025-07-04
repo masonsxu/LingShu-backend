@@ -114,3 +114,16 @@ async def process_message_for_channel(
     """
     result = await channel_processor.process_message_with_checks(channel_id, message, repo)
     return result
+
+
+@app.put("/channels/{channel_id}", response_model=ChannelModel, tags=["Channels"])
+async def update_channel(
+    channel_id: str,
+    channel: ChannelModel,
+    repo: ChannelRepository = Depends(get_channel_repository),
+):
+    """更新指定 ID 的通道。"""
+    existing_channel = repo.get_by_id(channel_id)
+    if not existing_channel:
+        raise HTTPException(status_code=404, detail="Channel not found.")
+    return repo.update(channel)

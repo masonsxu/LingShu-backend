@@ -60,3 +60,21 @@ class ChannelRepository:
         self.session.commit()
         self.session.refresh(db_channel)
         return db_channel
+
+    def update(self, channel: ChannelModel) -> ChannelModel:
+        """更新通道.
+
+        参数：
+            channel: 要更新的通道对象.
+
+        返回：
+            更新后的通道对象.
+        """
+        db_channel = self.session.get(ChannelModel, channel.id)
+        if not db_channel:
+            raise ValueError(f"Channel with id {channel.id} not found")
+        for field, value in channel.model_dump().items():
+            setattr(db_channel, field, value)
+        self.session.commit()
+        self.session.refresh(db_channel)
+        return db_channel
