@@ -247,6 +247,18 @@ class ChannelProcessor:
                 "status": "sent",
                 "url": destination_config.url,
             }
+        elif dest_type == "http" and isinstance(destination_config, dict):
+            # 处理字典格式的HTTP目标
+            app_logger.info(
+                "Simulating HTTP (fallback dict) "
+                f"{destination_config.get('method', 'POST')} to "
+                f"{destination_config.get('url')} with message: {message}"
+            )
+            return {
+                "destination_type": "http",
+                "status": "sent",
+                "url": destination_config.get("url"),
+            }
         elif dest_type == "tcp" and hasattr(destination_config, "host"):
             # 手动处理TCP目标
             app_logger.info(
@@ -259,6 +271,19 @@ class ChannelProcessor:
                 "status": "sent",
                 "host": destination_config.host,
                 "port": destination_config.port,
+            }
+        elif dest_type == "tcp" and isinstance(destination_config, dict):
+            # 处理字典格式的TCP目标
+            app_logger.info(
+                "Simulating TCP (fallback dict) send to "
+                f"{destination_config.get('host')}:{destination_config.get('port')} "
+                f"with message: {message}"
+            )
+            return {
+                "destination_type": "tcp",
+                "status": "sent",
+                "host": destination_config.get("host"),
+                "port": destination_config.get("port"),
             }
         else:
             app_logger.warning(f"Unknown destination type: {dest_type or 'unknown'}")

@@ -1,6 +1,5 @@
 """通道领域模型单元测试"""
 
-
 import pytest
 from pydantic import ValidationError
 

@@ -66,8 +66,8 @@ class ChannelResponse(BaseModel):
             filters=channel_model.filters,
             transformers=channel_model.transformers,
             destinations=channel_model.destinations,
-            created_at=getattr(channel_model, 'created_at', None),
-            updated_at=getattr(channel_model, 'updated_at', None),
+            created_at=getattr(channel_model, "created_at", None),
+            updated_at=getattr(channel_model, "updated_at", None),
         )
 
 

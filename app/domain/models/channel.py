@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field as PydanticField, model_validator
+from pydantic import BaseModel, Field as PydanticField
 from sqlmodel import JSON, Column, Field, SQLModel
 
 
@@ -127,14 +127,8 @@ class ChannelModel(SQLModel, table=True):
         sa_column=Column(JSON), description="数据目标配置列表。"
     )
 
-    @model_validator(mode="after")
-    def validate_json_fields(self) -> "ChannelModel":
-        """反序列化时将 JSON 字典自动转换为对应的 Pydantic 配置模型，保证类型安全."""
-        self.source = self._convert_source(self.source)
-        self.filters = self._convert_filters(self.filters)
-        self.transformers = self._convert_transformers(self.transformers)
-        self.destinations = self._convert_destinations(self.destinations)
-        return self
+    # 注意：由于SQLModel的限制，model_validator可能不会被调用
+    # 我们依赖处理器中的回退逻辑来处理类型转换
 
     @staticmethod
     def _convert_source(source):
