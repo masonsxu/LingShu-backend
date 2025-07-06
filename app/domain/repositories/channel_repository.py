@@ -78,7 +78,7 @@ class ChannelRepository:
         self.session.commit()
         self.session.refresh(db_channel)
         return db_channel
-    
+
     def delete(self, channel_id: str) -> bool:
         """删除通道.
 
@@ -91,7 +91,7 @@ class ChannelRepository:
         db_channel = self.session.get(ChannelModel, channel_id)
         if not db_channel:
             return False
-        
+
         self.session.delete(db_channel)
         self.session.commit()
         return True

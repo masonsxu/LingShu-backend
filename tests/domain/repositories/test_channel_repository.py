@@ -1,4 +1,5 @@
 """通道仓储单元测试"""
+
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
@@ -36,7 +37,7 @@ class TestChannelRepository:
             description="Test channel for repository testing",
             enabled=True,
             source=HTTPSourceConfig(path="/test", method="POST"),
-            destinations=[HTTPDestinationConfig(url="http://test.com/webhook")]
+            destinations=[HTTPDestinationConfig(url="http://test.com/webhook")],
         )
 
     def test_add_channel(self, repository, sample_channel):

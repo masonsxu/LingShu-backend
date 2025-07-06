@@ -20,6 +20,7 @@ dependencies = [
     "httpx==0.28.1",
     "idna==3.10",
     "jinja2==3.1.6",
+    "loguru>=0.7.0",
     "markdown-it-py==3.0.0",
     "markupsafe==3.0.2",
     "mdurl==0.1.2",
@@ -72,16 +73,17 @@ select = [
 ]
 ignore = [
     "B008",  # FastAPI依赖注入场景下，忽略这个报错
+    "B904",  # 忽略异常链接警告，在API层面这是可以接受的
 ]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+combine-as-imports = true
+force-single-line = false
 
 [tool.ruff.format]
 quote-style = "double"
 docstring-code-format = true
 skip-magic-trailing-comma = false
-
-[tool.ruff.isort]
-known-first-party = ["app"]
-combine-as-imports = true
-force-single-line = false
 
 

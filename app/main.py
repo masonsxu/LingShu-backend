@@ -7,6 +7,10 @@ from app.api.routers import app as api_router
 from app.domain.models.channel import ChannelModel
 from app.domain.repositories.channel_repository import ChannelRepository
 from app.infrastructure.database import create_db_and_tables, get_session
+from app.infrastructure.logging_config import auto_setup_logging
+
+# 初始化日志配置
+auto_setup_logging()
 
 
 @asynccontextmanager

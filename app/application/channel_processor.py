@@ -1,7 +1,7 @@
-import logging
 from typing import Any
 
 from fastapi import HTTPException, status
+from loguru import logger
 
 from app.domain.models.channel import (
     ChannelModel,
@@ -12,7 +12,8 @@ from app.domain.models.channel import (
 )
 from app.domain.repositories.channel_repository import ChannelRepository
 
-logger = logging.getLogger(__name__)
+# 绑定模块名称到logger
+app_logger = logger.bind(module=__name__)
 
 
 class ChannelProcessor:
@@ -80,7 +81,7 @@ class ChannelProcessor:
         返回：
             处理结果字典，包括最终消息和各目标分发结果。
         """
-        logger.info(f"Processing message for channel '{channel.name}' (ID: {channel.id})")
+        app_logger.info(f"Processing message for channel '{channel.name}' (ID: {channel.id})")
         current_message = message
 
         # 过滤
@@ -112,19 +113,23 @@ class ChannelProcessor:
             if not isinstance(filter_config, PythonScriptFilterConfig):
                 continue
             script = filter_config.script
-            logger.debug(f"Applying Python script filter {i} for channel '{channel.name}'")
+            app_logger.debug(f"Applying Python script filter {i} for channel '{channel.name}'")
             try:
                 local_vars = {"message": message, "_passed": False}
                 exec(script, {}, local_vars)
                 if not local_vars.get("_passed", False):
-                    logger.info(f"Message filtered out by script {i} for channel '{channel.name}'")
+                    app_logger.info(
+                        f"Message filtered out by script {i} for channel '{channel.name}'"
+                    )
                     return {
                         "status": "filtered",
                         "message": "Message filtered out.",
                     }
                 message = local_vars.get("message", message)
             except Exception as e:
-                logger.error(f"Error executing filter script {i} for channel '{channel.name}': {e}")
+                app_logger.error(
+                    f"Error executing filter script {i} for channel '{channel.name}': {e}"
+                )
                 return {
                     "status": "error",
                     "message": f"Filter script error: {e}",
@@ -139,7 +144,7 @@ class ChannelProcessor:
             if not isinstance(transformer_config, PythonScriptTransformerConfig):
                 continue
             script = transformer_config.script
-            logger.debug(f"Applying Python script transformer {i} for channel '{channel.name}'")
+            app_logger.debug(f"Applying Python script transformer {i} for channel '{channel.name}'")
             try:
                 local_vars = {
                     "message": message,
@@ -149,13 +154,13 @@ class ChannelProcessor:
                 if "_transformed_message" in local_vars:
                     message = local_vars["_transformed_message"]
                 else:
-                    logger.warning(
+                    app_logger.warning(
                         f"Transformer script {i} for channel '{channel.name}' "
                         "did not set '_transformed_message'. "
                         "Message remains unchanged."
                     )
             except Exception as e:
-                logger.error(
+                app_logger.error(
                     f"Error executing transformer script {i} for channel '{channel.name}': {e}"
                 )
                 return {
@@ -167,10 +172,10 @@ class ChannelProcessor:
         """将消息分发到所有目标，返回分发结果列表。"""
         results = []
         for i, destination_config in enumerate(channel.destinations):
-            logger.debug(f"Sending message to destination {i} for channel '{channel.name}'")
+            app_logger.debug(f"Sending message to destination {i} for channel '{channel.name}'")
             try:
                 if isinstance(destination_config, HTTPDestinationConfig):
-                    logger.info(
+                    app_logger.info(
                         "Simulating HTTP "
                         f"{destination_config.method} to "
                         f"{destination_config.url} with message: {message}"
@@ -183,7 +188,7 @@ class ChannelProcessor:
                         }
                     )
                 elif isinstance(destination_config, TCPDestinationConfig):
-                    logger.info(
+                    app_logger.info(
                         "Simulating TCP send to "
                         f"{destination_config.host}:{destination_config.port} "
                         f"with message: {message}"
@@ -197,10 +202,12 @@ class ChannelProcessor:
                         }
                     )
                 else:
-                    logger.warning(f"Unknown destination type: {destination_config.type}")
+                    app_logger.warning(f"Unknown destination type: {destination_config.type}")
                     results.append({"destination_type": "unknown", "status": "skipped"})
             except Exception as e:
-                logger.error(f"Error sending to destination {i} for channel '{channel.name}': {e}")
+                app_logger.error(
+                    f"Error sending to destination {i} for channel '{channel.name}': {e}"
+                )
                 if hasattr(destination_config, "type"):
                     destination_type = destination_config.type
                 elif isinstance(destination_config, dict):
