@@ -173,6 +173,9 @@ class ChannelProcessor:
         results = []
         for i, destination_config in enumerate(channel.destinations):
             app_logger.debug(f"Sending message to destination {i} for channel '{channel.name}'")
+            app_logger.debug(f"Destination config type: {type(destination_config)}")
+            app_logger.debug(f"Destination config: {destination_config}")
+            
             try:
                 if isinstance(destination_config, HTTPDestinationConfig):
                     app_logger.info(
