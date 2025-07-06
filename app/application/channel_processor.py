@@ -202,8 +202,16 @@ class ChannelProcessor:
                         }
                     )
                 else:
-                    app_logger.warning(f"Unknown destination type: {destination_config.type}")
-                    results.append({"destination_type": "unknown", "status": "skipped"})
+                    # 处理未知类型的目标配置
+                    if hasattr(destination_config, "type"):
+                        dest_type = destination_config.type
+                    elif isinstance(destination_config, dict):
+                        dest_type = destination_config.get("type", "unknown")
+                    else:
+                        dest_type = "unknown"
+
+                    app_logger.warning(f"Unknown destination type: {dest_type}")
+                    results.append({"destination_type": dest_type, "status": "skipped"})
             except Exception as e:
                 app_logger.error(
                     f"Error sending to destination {i} for channel '{channel.name}': {e}"
