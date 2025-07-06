@@ -30,7 +30,12 @@ class ChannelRepository:
             匹配的通道对象，若不存在则为 None.
 
         """
-        return self.session.get(ChannelModel, channel_id)
+        channel = self.session.get(ChannelModel, channel_id)
+        if channel:
+            # 确保从数据库读取的数据正确转换为Pydantic模型
+            channel_data = channel.model_dump()
+            return ChannelModel(**channel_data)
+        return None
 
     def get_all(self) -> Sequence[ChannelModel]:
         """获取所有通道.
@@ -40,7 +45,12 @@ class ChannelRepository:
 
         """
         channels = self.session.exec(select(ChannelModel)).all()
-        return channels
+        # 确保从数据库读取的数据正确转换为Pydantic模型
+        converted_channels = []
+        for channel in channels:
+            channel_data = channel.model_dump()
+            converted_channels.append(ChannelModel(**channel_data))
+        return converted_channels
 
     def add(self, channel: ChannelModel) -> ChannelModel:
         """向数据库添加一个通道.
