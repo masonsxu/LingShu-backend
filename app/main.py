@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import app as api_router
+from app.api.channel_router import router as channel_router
 from app.domain.models.channel import ChannelModel
 from app.domain.repositories.channel_repository import ChannelRepository
 from app.infrastructure.database import create_db_and_tables, get_session
@@ -81,4 +81,10 @@ app.add_middleware(
 )
 
 
-app.include_router(api_router)
+app.include_router(channel_router)
+
+# 添加根路由
+@app.get("/")
+async def read_root():
+    """根路由"""
+    return {"message": "Welcome to LingShu!", "version": "0.1.0"}
