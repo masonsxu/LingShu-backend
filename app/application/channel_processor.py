@@ -175,56 +175,15 @@ class ChannelProcessor:
             app_logger.debug(f"Sending message to destination {i} for channel '{channel.name}'")
             app_logger.debug(f"Destination config type: {type(destination_config)}")
             app_logger.debug(f"Destination config: {destination_config}")
-            
-            try:
-                if isinstance(destination_config, HTTPDestinationConfig):
-                    app_logger.info(
-                        "Simulating HTTP "
-                        f"{destination_config.method} to "
-                        f"{destination_config.url} with message: {message}"
-                    )
-                    results.append(
-                        {
-                            "destination_type": "http",
-                            "status": "sent",
-                            "url": destination_config.url,
-                        }
-                    )
-                elif isinstance(destination_config, TCPDestinationConfig):
-                    app_logger.info(
-                        "Simulating TCP send to "
-                        f"{destination_config.host}:{destination_config.port} "
-                        f"with message: {message}"
-                    )
-                    results.append(
-                        {
-                            "destination_type": "tcp",
-                            "status": "sent",
-                            "host": destination_config.host,
-                            "port": destination_config.port,
-                        }
-                    )
-                else:
-                    # 处理未知类型的目标配置
-                    if hasattr(destination_config, "type"):
-                        dest_type = destination_config.type
-                    elif isinstance(destination_config, dict):
-                        dest_type = destination_config.get("type", "unknown")
-                    else:
-                        dest_type = "unknown"
 
-                    app_logger.warning(f"Unknown destination type: {dest_type}")
-                    results.append({"destination_type": dest_type, "status": "skipped"})
+            try:
+                result = self._send_to_single_destination(destination_config, message)
+                results.append(result)
             except Exception as e:
                 app_logger.error(
                     f"Error sending to destination {i} for channel '{channel.name}': {e}"
                 )
-                if hasattr(destination_config, "type"):
-                    destination_type = destination_config.type
-                elif isinstance(destination_config, dict):
-                    destination_type = destination_config.get("type", "unknown")
-                else:
-                    destination_type = "unknown"
+                destination_type = self._get_destination_type(destination_config)
                 results.append(
                     {
                         "destination_type": destination_type,
@@ -233,3 +192,83 @@ class ChannelProcessor:
                     }
                 )
         return results
+
+    def _send_to_single_destination(self, destination_config, message: Any) -> dict:
+        """发送消息到单个目标"""
+        # 首先尝试使用isinstance检查
+        if isinstance(destination_config, HTTPDestinationConfig):
+            return self._send_to_http_destination(destination_config, message)
+        elif isinstance(destination_config, TCPDestinationConfig):
+            return self._send_to_tcp_destination(destination_config, message)
+        else:
+            # 如果isinstance失败，尝试基于type字段处理
+            return self._send_to_fallback_destination(destination_config, message)
+
+    def _send_to_http_destination(self, destination_config, message: Any) -> dict:
+        """发送到HTTP目标"""
+        app_logger.info(
+            "Simulating HTTP "
+            f"{destination_config.method} to "
+            f"{destination_config.url} with message: {message}"
+        )
+        return {
+            "destination_type": "http",
+            "status": "sent",
+            "url": destination_config.url,
+        }
+
+    def _send_to_tcp_destination(self, destination_config, message: Any) -> dict:
+        """发送到TCP目标"""
+        app_logger.info(
+            "Simulating TCP send to "
+            f"{destination_config.host}:{destination_config.port} "
+            f"with message: {message}"
+        )
+        return {
+            "destination_type": "tcp",
+            "status": "sent",
+            "host": destination_config.host,
+            "port": destination_config.port,
+        }
+
+    def _send_to_fallback_destination(self, destination_config, message: Any) -> dict:
+        """处理未知类型的目标配置（回退方案）"""
+        dest_type = self._get_destination_type(destination_config)
+
+        if dest_type == "http" and hasattr(destination_config, "url"):
+            # 手动处理HTTP目标
+            app_logger.info(
+                "Simulating HTTP (fallback) "
+                f"{getattr(destination_config, 'method', 'POST')} to "
+                f"{destination_config.url} with message: {message}"
+            )
+            return {
+                "destination_type": "http",
+                "status": "sent",
+                "url": destination_config.url,
+            }
+        elif dest_type == "tcp" and hasattr(destination_config, "host"):
+            # 手动处理TCP目标
+            app_logger.info(
+                "Simulating TCP (fallback) send to "
+                f"{destination_config.host}:{destination_config.port} "
+                f"with message: {message}"
+            )
+            return {
+                "destination_type": "tcp",
+                "status": "sent",
+                "host": destination_config.host,
+                "port": destination_config.port,
+            }
+        else:
+            app_logger.warning(f"Unknown destination type: {dest_type or 'unknown'}")
+            return {"destination_type": dest_type or "unknown", "status": "skipped"}
+
+    def _get_destination_type(self, destination_config) -> str:
+        """获取目标配置的类型"""
+        if hasattr(destination_config, "type"):
+            return destination_config.type
+        elif isinstance(destination_config, dict):
+            return destination_config.get("type", "unknown")
+        else:
+            return "unknown"
