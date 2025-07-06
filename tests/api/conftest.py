@@ -1,12 +1,15 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import SQLModel, create_engine, Session
-from app.main import app
+from sqlmodel import Session, SQLModel, create_engine
+
 from app.infrastructure.database import get_session
-import os
+from app.main import app
 
 # 创建测试用的文件数据库
 TEST_DATABASE_URL = "sqlite:///./test.db"
+
 
 @pytest.fixture(name="session")
 def session_fixture():
@@ -17,6 +20,7 @@ def session_fixture():
     SQLModel.metadata.drop_all(engine)
     os.remove("./test.db")
 
+
 @pytest.fixture(name="client")
 def client_fixture(session: Session):
     def override_get_session():
@@ -25,4 +29,4 @@ def client_fixture(session: Session):
     app.dependency_overrides[get_session] = override_get_session
     with TestClient(app) as client:
         yield client
-    app.dependency_overrides.clear() 
+    app.dependency_overrides.clear()
